@@ -13,6 +13,7 @@ void registerCommand() {
 
     // ---- Process Management ----------
     shell.registerCommand("ps", listProcesses); 
+    shell.registerCommand("run", runExternalCommand);
     // ----  
 }
 
