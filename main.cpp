@@ -4,6 +4,7 @@
 #include "utils.h"
 
 CommandManager shell;
+std::vector<Job> backgroundJobs;
 
 void registerCommand() {
     // ---- File Management -------------
@@ -14,6 +15,7 @@ void registerCommand() {
     // ---- Process Management ----------
     shell.registerCommand("ps", listProcesses); 
     shell.registerCommand("run", runExternalCommand);
+    shell.registerCommand("jobs", jobsCommand);
     // ----  
 }
 
