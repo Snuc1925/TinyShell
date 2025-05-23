@@ -8,3 +8,6 @@ g++ main.cpp command_manager.cpp -o main
 ```
 
 Task: https://docs.google.com/spreadsheets/d/1KUT1dCLLEvfy9e1ztO1VcMMs76SHl7lLZOKDRJgss5E/edit?usp=sharing
+
+
+Cuong: I add a new command "di" to show the capacity of a file.
