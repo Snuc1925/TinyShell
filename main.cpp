@@ -2,6 +2,8 @@
 #include "commands/file_commands.h"
 #include "commands/process_commands.h"
 #include "utils.h"
+#include "commands/disk_commands.h"
+#include <windows.h>
 
 CommandManager shell;
 std::vector<Job> backgroundJobs;
@@ -16,7 +18,15 @@ void registerCommand() {
     shell.registerCommand("ps", listProcesses); 
     shell.registerCommand("run", runExternalCommand);
     shell.registerCommand("jobs", jobsCommand);
-    // ----  
+    
+    // ---- Disk Management -----------
+    shell.registerCommand("df", checkCapacityMemory); // Kiểm tra dung lượng ổ đĩa
+    shell.registerCommand("du", showCapacityFolder); // Kiểm tra dung lượng folder
+    shell.registerCommand("di", showCapacityFile); // Kiểm tra dung lượng ổ đĩa
+    shell.registerCommand("clear", [](const std::vector<std::string>& args) {
+        std::cout << "Exiting shell..." << std::endl;
+        exit(0);
+    });
 }
 
 int main() {
@@ -26,7 +36,7 @@ int main() {
 
     std::string input;
     while (true) {
-        GetCurrentDirectory(MAX_PATH, currentDir);
+        GetCurrentDirectoryA(MAX_PATH, currentDir);
 
         set_color(10); // Màu xanh lá cho prompt
         std::cout << currentDir << "> ";
