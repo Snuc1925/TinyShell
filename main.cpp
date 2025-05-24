@@ -18,11 +18,14 @@ void registerCommand() {
     shell.registerCommand("ps", listProcesses); 
     shell.registerCommand("run", runExternalCommand);
     shell.registerCommand("jobs", jobsCommand);
+    shell.registerCommand("top", topCommand);
+    shell.registerCommand("fg", fgCommand);
+    shell.registerCommand("fg %id", fgIdCommand);
     
     // ---- Disk Management -----------
     shell.registerCommand("df", checkCapacityMemory); // Kiểm tra dung lượng ổ đĩa
     shell.registerCommand("du", showCapacityFolder); // Kiểm tra dung lượng folder
-    shell.registerCommand("di", showCapacityFile); // Kiểm tra dung lượng ổ đĩa
+    shell.registerCommand("di", showCapacityFile); // Kiểm tra dung lượng file
     shell.registerCommand("clear", [](const std::vector<std::string>& args) {
         std::cout << "Exiting shell..." << std::endl;
         exit(0);

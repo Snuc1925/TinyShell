@@ -116,6 +116,143 @@ void jobsCommand(const std::vector<std::string>& args) {
     }
 }
 
+void topCommand(const std::vector<std::string>& args) {
+    //Hiển thị tiến trình theo thời gian thực. (background mode)
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap == INVALID_HANDLE_VALUE) {
+        std::cerr << "Error: Unable to create process snapshot." << std::endl;
+        return;
+    }
+    PROCESSENTRY32 pe;
+    pe.dwSize = sizeof(PROCESSENTRY32);
+    if (Process32First(hSnap, &pe)) {
+        std::cout << "PID\tProcess Name\n";
+        do {
+            std::cout << pe.th32ProcessID << "\t" << pe.szExeFile << std::endl;
+        } while (Process32Next(hSnap, &pe));
+    } else {
+        std::cerr << "Error: Unable to retrieve process list." << std::endl;
+    }
+    CloseHandle(hSnap);
+    std::cout << "Press Ctrl+C to stop.\n";
+    // Giữ cho tiến trình chạy liên tục
+    while (true) {
+        Sleep(1000); // Cập nhật mỗi giây
+        system("cls"); // Xóa
+        hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (hSnap == INVALID_HANDLE_VALUE) {
+            std::cerr << "Error: Unable to create process snapshot." << std::endl;
+            return;
+        }
+        if (Process32First(hSnap, &pe)) {
+            std::cout << "PID\tProcess Name\n";
+            do {
+                std::cout << pe.th32ProcessID << "\t" << pe.szExeFile << std::endl;
+            } while (Process32Next(hSnap, &pe));
+        } else {
+            std::cerr << "Error: Unable to retrieve process list." << std::endl;
+        }
+    }
 
+        CloseHandle(hSnap);
+        std::cout << "Press Ctrl+C to stop.\n";
+        // Cập nhật danh sách tiến trình nền
+        for (auto it = backgroundJobs.begin(); it != backgroundJobs.end();) {
+            DWORD status = WaitForSingleObject(it->hProcess, 0);
+            if (status == WAIT_OBJECT_0) {
+                // tiến trình đã kết thúc
+                CloseHandle(it->hProcess);
+                it = backgroundJobs.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        if (backgroundJobs.empty()) {
+            std::cout << "No background jobs.\n";
+        } else {
+            std::cout << "Background jobs:\n";
+            for (const auto& job : backgroundJobs) {
+                std::cout << "PID: " << job.pid << " - " << job.cmdLine << std::endl;
+            }
+        }
+
+        std::cout << "Press Ctrl+C to stop.\n";
+
+        // Đợi 1 giây trước khi cập nhật lại
+        Sleep(1000);
+
+        //Kiêm tra xem có tiến trình nào đã kết thúc không
+        for (auto it = backgroundJobs.begin(); it != backgroundJobs.end();) {
+            DWORD status = WaitForSingleObject(it->hProcess, 0);
+            if (status == WAIT_OBJECT_0) {
+                // tiến trình đã kết thúc
+                CloseHandle(it->hProcess);
+                it = backgroundJobs.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        if (backgroundJobs.empty()) {
+            std::cout << "No background jobs.\n";
+        } else {
+            std::cout << "Background jobs:\n";
+            for (const auto& job : backgroundJobs) {
+                std::cout << "PID: " << job.pid << " - " << job.cmdLine << std::endl;
+            }
+        }
+
+
+        std::cout << "Press Ctrl+C to stop.\n";
+    
+}
+
+void fgCommand(const std::vector<std::string>& args) {
+    //Đưa job từ background lên foreground. Nếu có nhiều job thì lấy job thứ id
+    if (args.size() < 2) {
+        std::cerr << "Usage: fg <job_id>\n";
+        return;
+    }
+    int jobId = std::stoi(args[1]);
+    if (jobId < 0 || jobId >= backgroundJobs.size()) {
+        std::cerr << "Invalid job ID.\n";
+        return;
+    }
+    Job& job = backgroundJobs[jobId];
+    // Đưa tiến trình lên foreground
+    if (AttachConsole(job.pid)) {
+        std::cout << "Attached to job with PID: " << job.pid << "\n";
+        // Đợi tiến trình kết thúc
+        WaitForSingleObject(job.hProcess, INFINITE);
+        CloseHandle(job.hProcess);
+        backgroundJobs.erase(backgroundJobs.begin() + jobId);
+    } else {
+        std::cerr << "Failed to attach to job.\n";
+    }
+}
+
+void fgIdCommand(const std::vector<std::string>& args) {
+    // Đưa job từ background lên foreground theo ID
+    if (args.size() < 2) {
+        std::cerr << "Usage: fg %<job_id>\n";
+        return;
+    }
+    int jobId = std::stoi(args[1].substr(1)); // Bỏ ký tự '%'
+    if (jobId < 0 || jobId >= backgroundJobs.size()) {
+        std::cerr << "Invalid job ID.\n";
+        return;
+    }
+    Job& job = backgroundJobs[jobId];
+    // Đưa tiến trình lên foreground
+    if (AttachConsole(job.pid)) {
+        std::cout << "Attached to job with PID: " << job.pid << "\n";
+        // Đợi tiến trình kết thúc
+        WaitForSingleObject(job.hProcess, INFINITE);
+        CloseHandle(job.hProcess);
+        backgroundJobs.erase(backgroundJobs.begin() + jobId);
+    } else {
+        std::cerr << "Failed to attach to job.\n";
+    }
+}
 
 #endif
