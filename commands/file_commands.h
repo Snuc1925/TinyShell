@@ -153,6 +153,74 @@ void copyFile(const std::vector<std::string>& args) {
     }
 }
 
+void moveFileOrDirectory(const std::vector<std::string>& args) {
+    if (args.size() < 2) {
+        std::cerr << "Usage: mv <source> <destination>" << std::endl;
+        return;
+    }
 
+    const std::string& source = args[0];
+    const std::string& dest = args[1];
+
+    // Check if source exists
+    DWORD sourceAttr = GetFileAttributesA(source.c_str());
+    if (sourceAttr == INVALID_FILE_ATTRIBUTES) {
+        std::cerr << "Error: Source '" << source << "' does not exist" << std::endl;
+        return;
+    }
+
+    // Check if destination is a directory
+    DWORD destAttr = GetFileAttributesA(dest.c_str());
+    bool destIsDirectory = (destAttr != INVALID_FILE_ATTRIBUTES) && 
+                          (destAttr & FILE_ATTRIBUTE_DIRECTORY);
+
+    std::string finalDest = dest;
+    if (destIsDirectory) {
+        // Extract filename from source path
+        size_t lastSlash = source.find_last_of("\\/");
+        std::string filename = (lastSlash == std::string::npos) ? 
+                              source : source.substr(lastSlash + 1);
+        finalDest = dest + "\\" + filename;
+    }
+
+    // Try to move the file
+    if (!MoveFileA(source.c_str(), finalDest.c_str())) {
+        DWORD error = GetLastError();
+        
+        // If simple move failed, try copy+delete
+        if (error == ERROR_NOT_SAME_DEVICE) {
+            // Copy the file
+            if (!CopyFileA(source.c_str(), finalDest.c_str(), FALSE)) {
+                std::cerr << "Error: Failed to copy '" << source << "' to '" 
+                          << finalDest << "' (Error: " << GetLastError() << ")" << std::endl;
+                return;
+            }
+            
+            // Delete original
+            if (sourceAttr & FILE_ATTRIBUTE_DIRECTORY) {
+                if (!RemoveDirectoryA(source.c_str())) {
+                    std::cerr << "Error: Failed to remove original directory '" 
+                              << source << "' (Error: " << GetLastError() << ")" << std::endl;
+                    return;
+                }
+            } else {
+                if (!DeleteFileA(source.c_str())) {
+                    std::cerr << "Error: Failed to remove original file '" 
+                              << source << "' (Error: " << GetLastError() << ")" << std::endl;
+                    return;
+                }
+            }
+            
+            std::cout << "Moved '" << source << "' to '" << finalDest << "'" << std::endl;
+            return;
+        }
+        
+        std::cerr << "Error: Failed to move '" << source << "' to '" 
+                  << finalDest << "' (Error: " << error << ")" << std::endl;
+        return;
+    }
+
+    std::cout << "Moved '" << source << "' to '" << finalDest << "'" << std::endl;
+}
 
 #endif

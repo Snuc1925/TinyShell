@@ -16,7 +16,7 @@ void registerCommand() {
     shell.registerCommand("cd", changeDirectory);
 
     shell.registerCommand("cp", copyFile);
-    shell.registerCommand("mv", moveFile);
+    shell.registerCommand("mv", moveFileOrDirectory);
 
     // ---- Process Management ----------
     shell.registerCommand("ps", listProcesses); 
