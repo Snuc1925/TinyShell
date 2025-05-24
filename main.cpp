@@ -4,7 +4,10 @@
 #include "utils.h"
 
 CommandManager shell;
+// Global variables
 std::vector<Job> backgroundJobs;
+DWORD currentForegroundPid = 0;
+HANDLE currentForegroundProcess = NULL;
 
 void registerCommand() {
     // ---- File Management -------------
@@ -30,7 +33,7 @@ void registerCommand() {
 
 int main() {
     char currentDir[MAX_PATH];
-
+    SetupConsoleCtrlHandler();
     registerCommand();
 
     std::string input;

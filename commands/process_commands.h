@@ -5,115 +5,29 @@
 #include <windows.h>
 #include <tlhelp32.h>
 #include <sstream>
-#include <signal.h>
-#include <sys/types.h>
+#include <algorithm>  // Added for std::remove_if
 #include <vector>
-#include <string>
-#include "../utils.h"
 
 // Struct lưu thông tin tiến trình background
 struct Job {
     DWORD pid;
     HANDLE hProcess;
     std::string cmdLine;
-};
-
-// Struct quản lý tiến trình foreground
-struct ForegroundProcess {
-    DWORD pid;
-    HANDLE hProcess;
-    std::string command;
     bool isSuspended;
 };
 
-// Biến toàn cục lưu danh sách tiến trình nền
+// Forward declarations
+BOOL SuspendProcess(DWORD pid);
+BOOL ResumeProcess(DWORD pid);
+BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType);
+
+// Biến toàn cục
 extern std::vector<Job> backgroundJobs;
+extern DWORD currentForegroundPid;
+extern HANDLE currentForegroundProcess;
 
-ForegroundProcess currentForegroundProcess = {0, NULL, "", false};
-
-BOOL SuspendForegroundProcess() {
-    if (currentForegroundProcess.hProcess == NULL || currentForegroundProcess.isSuspended) {
-        return FALSE;
-    }
-
-    // Tạm dừng tất cả thread của tiến trình
-    HANDLE hThreadSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-    if (hThreadSnapshot != INVALID_HANDLE_VALUE) {
-        THREADENTRY32 te32;
-        te32.dwSize = sizeof(THREADENTRY32);
-        
-        if (Thread32First(hThreadSnapshot, &te32)) {
-            do {
-                if (te32.th32OwnerProcessID == currentForegroundProcess.pid) {
-                    HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, te32.th32ThreadID);
-                    if (hThread != NULL) {
-                        SuspendThread(hThread);
-                        CloseHandle(hThread);
-                    }
-                }
-            } while (Thread32Next(hThreadSnapshot, &te32));
-        }
-        CloseHandle(hThreadSnapshot);
-    }
-
-    currentForegroundProcess.isSuspended = true;
-    std::cout << "\n[Suspended] " << currentForegroundProcess.pid << " - " 
-              << currentForegroundProcess.command << std::endl;
-    
-    return TRUE;
-}
-
-BOOL ResumeForegroundProcess() {
-    if (currentForegroundProcess.hProcess == NULL || !currentForegroundProcess.isSuspended) {
-        return FALSE;
-    }
-
-    // Tiếp tục tất cả thread của tiến trình
-    HANDLE hThreadSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-    if (hThreadSnapshot != INVALID_HANDLE_VALUE) {
-        THREADENTRY32 te32;
-        te32.dwSize = sizeof(THREADENTRY32);
-        
-        if (Thread32First(hThreadSnapshot, &te32)) {
-            do {
-                if (te32.th32OwnerProcessID == currentForegroundProcess.pid) {
-                    HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, te32.th32ThreadID);
-                    if (hThread != NULL) {
-                        ResumeThread(hThread);
-                        CloseHandle(hThread);
-                    }
-                }
-            } while (Thread32Next(hThreadSnapshot, &te32));
-        }
-        CloseHandle(hThreadSnapshot);
-    }
-
-    currentForegroundProcess.isSuspended = false;
-    std::cout << "[Resumed] " << currentForegroundProcess.pid << " - " 
-              << currentForegroundProcess.command << std::endl;
-    
-    return TRUE;
-}
-
-void fgCommand(const std::vector<std::string>& args) {
-    if (currentForegroundProcess.hProcess == NULL) {
-        std::cout << "No suspended foreground process" << std::endl;
-        return;
-    }
-
-    if (!currentForegroundProcess.isSuspended) {
-        std::cout << "No suspended process to resume" << std::endl;
-        return;
-    }
-
-    if (ResumeForegroundProcess()) {
-        // Đợi tiến trình hoàn thành
-        WaitForSingleObject(currentForegroundProcess.hProcess, INFINITE);
-        
-        // Dọn dẹp
-        CloseHandle(currentForegroundProcess.hProcess);
-        currentForegroundProcess = {0, NULL, "", false};
-    }
+void SetupConsoleCtrlHandler() {
+    SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 }
 
 void listProcesses(const std::vector<std::string>& args) {
@@ -159,57 +73,65 @@ void runExternalCommand(const std::vector<std::string>& args) {
     STARTUPINFOA si = { sizeof(si) };
     PROCESS_INFORMATION pi;
 
-    // QUAN TRỌNG: Thêm cờ DETACHED_PROCESS để tránh mở cửa sổ mới
-    DWORD creationFlags = isBackground ? DETACHED_PROCESS : 0;
-    
-    // QUAN TRỌNG: Đặt CREATE_NO_WINDOW cho console apps
-    if (cmdLine.find(".exe") != std::string::npos) {
-        creationFlags |= CREATE_NO_WINDOW;
-    }
+    DWORD creationFlags = isBackground ? CREATE_NEW_CONSOLE : 0;
 
-    // Tạo process với CREATE_NEW_PROCESS_GROUP để kiểm soát tốt hơn
-    if (!CreateProcessA(NULL, cmdMutable.data(), NULL, NULL, FALSE, 
-                       CREATE_NEW_PROCESS_GROUP | creationFlags,
-                       NULL, NULL, &si, &pi)) {
-        std::cerr << "Failed to start process. Error: " << GetLastError() << std::endl;
+    BOOL success = CreateProcessA(
+        NULL,
+        cmdMutable.data(),   
+        NULL, NULL, FALSE,
+        creationFlags,
+        NULL, NULL,
+        &si,
+        &pi
+    );
+
+    if (!success) {
+        std::cerr << "Failed to start process.\n";
         return;
     }
 
-    std::cout << "Started process with PID: " << pi.dwProcessId << std::endl;
+    std::cout << "Started process with PID: " << pi.dwProcessId << "\n";
+
+    // if (isBackground) {
+    //     backgroundJobs.push_back({ pi.dwProcessId, pi.hProcess, cmdLine, false });
+    //     CloseHandle(pi.hThread);
+    // } else {
+    //     currentForegroundPid = pi.dwProcessId;
+    //     currentForegroundProcess = pi.hProcess;
+    //     WaitForSingleObject(pi.hProcess, INFINITE);
+    //     CloseHandle(pi.hProcess);
+    //     CloseHandle(pi.hThread);
+    //     currentForegroundPid = 0;
+    //     currentForegroundProcess = NULL;
+    // }
 
     if (isBackground) {
-        backgroundJobs.push_back({ pi.dwProcessId, pi.hProcess, cmdLine });
+        backgroundJobs.push_back({ pi.dwProcessId, pi.hProcess, cmdLine, false });
         CloseHandle(pi.hThread);
     } else {
-        currentForegroundProcess.pid = pi.dwProcessId;
-        currentForegroundProcess.hProcess = pi.hProcess;
-        currentForegroundProcess.command = cmdLine;
-        currentForegroundProcess.isSuspended = false;
-
-        WaitForSingleObject(pi.hProcess, INFINITE);
-
-        // // Đợi với timeout ngắn để kiểm tra trạng thái
-        // while (WaitForSingleObject(pi.hProcess, 100) == WAIT_TIMEOUT) {
-        //     if (currentForegroundProcess.isSuspended) {
-        //         break; // Thoát nếu process bị suspend
-        //     }
-        // }
-
-        // Chỉ đóng handle nếu process đã kết thúc
-        if (WaitForSingleObject(pi.hProcess, 0) == WAIT_OBJECT_0) {
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
+        currentForegroundPid = pi.dwProcessId;
+        currentForegroundProcess = pi.hProcess;
+        
+        // Đợi với timeout thay vì INFINITE
+        while (WaitForSingleObject(pi.hProcess, 100) == WAIT_TIMEOUT) {
+            if (currentForegroundPid == 0) {  // Đã bị tạm dừng
+                backgroundJobs.push_back({ pi.dwProcessId, pi.hProcess, cmdLine, true });
+                return;
+            }
         }
-        currentForegroundProcess = {0, NULL, "", false};
+        
+        // Nếu tiến trình kết thúc bình thường
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        currentForegroundPid = 0;
+        currentForegroundProcess = NULL;
     }
 }
 
 void jobsCommand(const std::vector<std::string>& args) {
-    // Cập nhật danh sách jobs: loại bỏ tiến trình đã kết thúc
     for (auto it = backgroundJobs.begin(); it != backgroundJobs.end();) {
         DWORD status = WaitForSingleObject(it->hProcess, 0);
         if (status == WAIT_OBJECT_0) {
-            // tiến trình đã kết thúc
             CloseHandle(it->hProcess);
             it = backgroundJobs.erase(it);
         } else {
@@ -224,106 +146,175 @@ void jobsCommand(const std::vector<std::string>& args) {
 
     std::cout << "Background jobs:\n";
     for (const auto& job : backgroundJobs) {
-        std::cout << "PID: " << job.pid << " - " << job.cmdLine << std::endl;
+        std::cout << "PID: " << job.pid << " - " << job.cmdLine 
+                  << " [" << (job.isSuspended ? "Suspended" : "Running") << "]\n";
     }
 }
 
-// Handler cho Ctrl+C và Ctrl+Break
-BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
-    if (dwCtrlType == CTRL_C_EVENT || dwCtrlType == CTRL_BREAK_EVENT) {
-        if (currentForegroundProcess.hProcess != NULL && !currentForegroundProcess.isSuspended) {
-            // Tạm dừng tiến trình
-            HANDLE hThreadSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-            if (hThreadSnapshot != INVALID_HANDLE_VALUE) {
-                THREADENTRY32 te32;
-                te32.dwSize = sizeof(THREADENTRY32);
-                
-                if (Thread32First(hThreadSnapshot, &te32)) {
-                    do {
-                        if (te32.th32OwnerProcessID == currentForegroundProcess.pid) {
-                            HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, te32.th32ThreadID);
-                            if (hThread != NULL) {
-                                SuspendThread(hThread);
-                                CloseHandle(hThread);
-                            }
-                        }
-                    } while (Thread32Next(hThreadSnapshot, &te32));
-                }
-                CloseHandle(hThreadSnapshot);
-            }
+BOOL SuspendProcess(DWORD pid) {
+    HANDLE hThreadSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (hThreadSnapshot == INVALID_HANDLE_VALUE) {
+        return FALSE;
+    }
 
-            currentForegroundProcess.isSuspended = true;
-            std::cout << "\n[Suspended] " << currentForegroundProcess.pid << " - " 
-                      << currentForegroundProcess.command << std::endl;
+    THREADENTRY32 te32;
+    te32.dwSize = sizeof(THREADENTRY32);
+    
+    if (Thread32First(hThreadSnapshot, &te32)) {
+        do {
+            if (te32.th32OwnerProcessID == pid) {
+                HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, te32.th32ThreadID);
+                if (hThread != NULL) {
+                    SuspendThread(hThread);
+                    CloseHandle(hThread);
+                }
+            }
+        } while (Thread32Next(hThreadSnapshot, &te32));
+    }
+    
+    CloseHandle(hThreadSnapshot);
+    return TRUE;
+}
+
+BOOL ResumeProcess(DWORD pid) {
+    HANDLE hThreadSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (hThreadSnapshot == INVALID_HANDLE_VALUE) {
+        return FALSE;
+    }
+
+    THREADENTRY32 te32;
+    te32.dwSize = sizeof(THREADENTRY32);
+    
+    if (Thread32First(hThreadSnapshot, &te32)) {
+        do {
+            if (te32.th32OwnerProcessID == pid) {
+                HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, te32.th32ThreadID);
+                if (hThread != NULL) {
+                    ResumeThread(hThread);
+                    CloseHandle(hThread);
+                }
+            }
+        } while (Thread32Next(hThreadSnapshot, &te32));
+    }
+    
+    CloseHandle(hThreadSnapshot);
+    return TRUE;
+}
+
+// BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
+//     if (dwCtrlType == CTRL_C_EVENT && currentForegroundPid != 0) {
+//         if (SuspendProcess(currentForegroundPid)) {
+//             backgroundJobs.push_back({ currentForegroundPid, currentForegroundProcess, "", true });
+//             std::cout << "\n[Suspended] " << currentForegroundPid << std::endl;
+//             currentForegroundPid = 0;
+//             currentForegroundProcess = NULL;
+//             return TRUE;
+//         }
+//     }
+//     return FALSE;
+// }
+
+BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
+    if (dwCtrlType == CTRL_C_EVENT && currentForegroundPid != 0) {
+        if (SuspendProcess(currentForegroundPid)) {
+            backgroundJobs.push_back({ currentForegroundPid, currentForegroundProcess, "", true });
+            std::cout << "\n[Suspended] " << currentForegroundPid << std::endl;
             
-            // QUAN TRỌNG: Đóng handle và reset tiến trình foreground
-            CloseHandle(currentForegroundProcess.hProcess);
-            currentForegroundProcess = {0, NULL, "", false};
+            // Reset foreground process
+            currentForegroundPid = 0;
+            currentForegroundProcess = NULL;
             
-            // Hiển thị lại prompt
+            // QUAN TRỌNG: Hiển thị lại prompt
             char currentDir[MAX_PATH];
             GetCurrentDirectory(MAX_PATH, currentDir);
-            set_color(10);
-            std::cout << currentDir << "> ";
-            set_color(7);
             
-            return TRUE; // Ngăn không cho thoát chương trình
+            return TRUE;  // Ngăn không cho shell thoát
         }
     }
     return FALSE;
 }
 
-void SetupConsoleCtrlHandler() {
-    SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+void fgCommand(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        std::cerr << "Usage: fg <pid>" << std::endl;
+        return;
+    }
+
+    DWORD pid;
+    try {
+        pid = std::stoul(args[0]);
+    } catch (...) {
+        std::cerr << "Invalid PID" << std::endl;
+        return;
+    }
+
+    for (auto it = backgroundJobs.begin(); it != backgroundJobs.end(); ++it) {
+        if (it->pid == pid && it->isSuspended) {
+            if (ResumeProcess(pid)) {
+                currentForegroundPid = pid;
+                currentForegroundProcess = it->hProcess;
+                WaitForSingleObject(it->hProcess, INFINITE);
+                CloseHandle(it->hProcess);
+                backgroundJobs.erase(it);
+                currentForegroundPid = 0;
+                currentForegroundProcess = NULL;
+                return;
+            }
+        }
+    }
+    std::cerr << "No suspended process with PID " << pid << std::endl;
 }
 
-// Thêm prototype cho hàm bgCommand
-void bgCommand(const std::vector<std::string>& args);
-
-// Hàm xử lý lệnh bg
 void bgCommand(const std::vector<std::string>& args) {
-    if (currentForegroundProcess.hProcess == NULL) {
-        std::cout << "No suspended foreground process" << std::endl;
+    if (args.empty()) {
+        std::cerr << "Usage: bg <pid>" << std::endl;
         return;
     }
 
-    if (!currentForegroundProcess.isSuspended) {
-        std::cout << "No suspended process to background" << std::endl;
+    DWORD pid;
+    try {
+        pid = std::stoul(args[0]);
+    } catch (...) {
+        std::cerr << "Invalid PID" << std::endl;
         return;
     }
 
-    // Tiếp tục tiến trình nhưng để chạy nền
-    HANDLE hThreadSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-    if (hThreadSnapshot != INVALID_HANDLE_VALUE) {
-        THREADENTRY32 te32;
-        te32.dwSize = sizeof(THREADENTRY32);
-        
-        if (Thread32First(hThreadSnapshot, &te32)) {
-            do {
-                if (te32.th32OwnerProcessID == currentForegroundProcess.pid) {
-                    HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, te32.th32ThreadID);
-                    if (hThread != NULL) {
-                        ResumeThread(hThread);
-                        CloseHandle(hThread);
-                    }
-                }
-            } while (Thread32Next(hThreadSnapshot, &te32));
+    for (auto& job : backgroundJobs) {
+        if (job.pid == pid && job.isSuspended) {
+            if (ResumeProcess(pid)) {
+                job.isSuspended = false;
+                std::cout << "[Resumed in background] " << pid << std::endl;
+                return;
+            }
         }
-        CloseHandle(hThreadSnapshot);
+    }
+    std::cerr << "No suspended process with PID " << pid << std::endl;
+}
+
+void suspendCommand(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        std::cerr << "Usage: suspend <pid>" << std::endl;
+        return;
     }
 
-    // Thêm vào danh sách job background
-    backgroundJobs.push_back({
-        currentForegroundProcess.pid,
-        currentForegroundProcess.hProcess,
-        currentForegroundProcess.command
-    });
+    DWORD pid;
+    try {
+        pid = std::stoul(args[0]);
+    } catch (...) {
+        std::cerr << "Invalid PID" << std::endl;
+        return;
+    }
 
-    std::cout << "[Background] " << currentForegroundProcess.pid << " - " 
-              << currentForegroundProcess.command << std::endl;
-
-    // Reset thông tin foreground process
-    currentForegroundProcess = {0, NULL, "", false};
+    for (auto& job : backgroundJobs) {
+        if (job.pid == pid && !job.isSuspended) {
+            if (SuspendProcess(pid)) {
+                job.isSuspended = true;
+                std::cout << "[Suspended] " << pid << std::endl;
+                return;
+            }
+        }
+    }
+    std::cerr << "No running process with PID " << pid << std::endl;
 }
 
 #endif
