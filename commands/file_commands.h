@@ -153,36 +153,6 @@ void copyFile(const std::vector<std::string>& args) {
     }
 }
 
-void moveFile(const std::vector<std::string>& args) {
-    if (args.size() != 2) {
-        std::cerr << "Usage: mv <source> <destination>" << std::endl;
-        return;
-    }
 
-    const std::string& source = args[0];
-    const std::string& dest = args[1];
-
-    DWORD destAttr = GetFileAttributesA(dest.c_str());
-    
-    // Nếu đích là thư mục tồn tại, di chuyển vào trong thư mục đó
-    if (destAttr != INVALID_FILE_ATTRIBUTES && (destAttr & FILE_ATTRIBUTE_DIRECTORY)) {
-        std::string fileName = source.substr(source.find_last_of("\\/") + 1);
-        std::string newPath = dest + "\\" + fileName;
-        
-        if (!MoveFileA(source.c_str(), newPath.c_str())) {
-            std::cerr << "Error moving file into directory: " << GetLastError() << std::endl;
-        } else {
-            std::cout << "Moved '" << source << "' to '" << newPath << "'" << std::endl;
-        }
-    } 
-    // Nếu không phải thư mục, đổi tên hoặc di chuyển bình thường
-    else {
-        if (!MoveFileA(source.c_str(), dest.c_str())) {
-            std::cerr << "Error moving/renaming file: " << GetLastError() << std::endl;
-        } else {
-            std::cout << "Moved/renamed '" << source << "' to '" << dest << "'" << std::endl;
-        }
-    }
-}
 
 #endif
