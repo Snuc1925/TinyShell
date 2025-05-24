@@ -12,11 +12,20 @@ void registerCommand() {
     shell.registerCommand("mkdir", makeDirectory); // Tạo folder mới tại folder hiện tại 
     shell.registerCommand("cd", changeDirectory);
 
+    shell.registerCommand("cp", copyFile);
+    shell.registerCommand("mv", moveFile);
+
     // ---- Process Management ----------
     shell.registerCommand("ps", listProcesses); 
     shell.registerCommand("run", runExternalCommand);
     shell.registerCommand("jobs", jobsCommand);
+    shell.registerCommand("fg", fgCommand); // Thêm lệnh fg
+    shell.registerCommand("bg", bgCommand);
+    // shell.registerCommand("suspended", showSuspendedProcesses);
     // ----  
+
+    // Thiết lập handler
+    SetupConsoleCtrlHandler();
 }
 
 int main() {
