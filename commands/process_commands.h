@@ -116,6 +116,64 @@ void jobsCommand(const std::vector<std::string>& args) {
     }
 }
 
+void findProcessByName(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        std::cerr << "Usage: find <process_name>\n";
+        return;
+    }
 
+    // Chuyển std::string sang std::wstring
+    std::wstring targetName(args[0].begin(), args[0].end());
+
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap == INVALID_HANDLE_VALUE) {
+        std::cerr << "Error: Unable to create process snapshot.\n";
+        return;
+    }
+
+    PROCESSENTRY32W pe;
+    pe.dwSize = sizeof(PROCESSENTRY32W);
+
+    bool found = false;
+    if (Process32FirstW(hSnap, &pe)) {
+        do {
+            if (targetName == pe.szExeFile) {
+                std::wcout << L"Found: PID " << pe.th32ProcessID << L" - " << pe.szExeFile << std::endl;
+                found = true;
+            }
+        } while (Process32NextW(hSnap, &pe));
+    }
+
+    if (!found) {
+        std::wcout << L"No process found with name: " << targetName << std::endl;
+    }
+
+    CloseHandle(hSnap);
+}
+
+DWORD getPIDByName(const std::string& processName) {
+    std::wstring targetName(processName.begin(), processName.end());
+
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+
+    PROCESSENTRY32W pe;
+    pe.dwSize = sizeof(PROCESSENTRY32W);
+
+    DWORD pid = 0;
+    if (Process32FirstW(hSnap, &pe)) {
+        do {
+            if (targetName == pe.szExeFile) {
+                pid = pe.th32ProcessID;
+                break;
+            }
+        } while (Process32NextW(hSnap, &pe));
+    }
+
+    CloseHandle(hSnap);
+    return pid;
+}
 
 #endif
