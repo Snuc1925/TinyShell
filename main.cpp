@@ -4,7 +4,10 @@
 #include "utils.h"
 
 CommandManager shell;
+// Global variables
 std::vector<Job> backgroundJobs;
+DWORD currentForegroundPid = 0;
+HANDLE currentForegroundProcess = NULL;
 
 void registerCommand()
 {
@@ -12,24 +15,31 @@ void registerCommand()
     shell.registerCommand("ls", listFiles);        // Liệt kê các file và folder ở folder hiện tại
     shell.registerCommand("mkdir", makeDirectory); // Tạo folder mới tại folder hiện tại
     shell.registerCommand("cd", changeDirectory);
+    shell.registerCommand("cp", copyFile);
+    shell.registerCommand("mv", moveFileOrDirectory);
+    shell.registerCommand("touch", touchCommand); // Create an empty file: touch file
+    shell.registerCommand("cat", catCommand);     // View contents of a file: cat file
+    shell.registerCommand("head", headCommand);   // Display the first 10 lines of file: head file
 
     // ---- Process Management ----------
     shell.registerCommand("ps", listProcesses);
     shell.registerCommand("run", runExternalCommand);
     shell.registerCommand("jobs", jobsCommand);
+    shell.registerCommand("fg", fgCommand); // Thêm lệnh fg
+    shell.registerCommand("bg", bgCommand);
+    // shell.registerCommand("suspended", showSuspendedProcesses);
     shell.registerCommand("kill", killCommand);       // Kết thúc tiến trình theo PID: kill <PID>
     shell.registerCommand("killall", killAllCommand); // Kết thúc tất cả tiến trình có cùng tên: killall <process_name>
+    // ----  
 
-    // ---- File Utility -------------
-    shell.registerCommand("touch", touchCommand); // Create an empty file: touch file
-    shell.registerCommand("cat", catCommand);     // View contents of a file: cat file
-    shell.registerCommand("head", headCommand);   // Display the first 10 lines of file: head file
+    // Thiết lập handler
+    SetupConsoleCtrlHandler();
 }
 
 int main()
 {
     char currentDir[MAX_PATH];
-
+    SetupConsoleCtrlHandler();
     registerCommand();
 
     std::string input;
