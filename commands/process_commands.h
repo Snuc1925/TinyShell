@@ -176,4 +176,112 @@ DWORD getPIDByName(const std::string& processName) {
     return pid;
 }
 
+void printCurrentDirectory(const std::vector<std::string>& args)
+{
+    char buffer[MAX_PATH];
+    if (GetCurrentDirectoryA(MAX_PATH, buffer))
+    {
+        std::cout << "Current directory: " << buffer << std::endl;
+    }
+    else
+    {
+        std::cerr << "Error: Unable to get current directory." << std::endl;
+    }
+}
+
+void deleteFile(const std::vector<std::string>& args)
+{
+    if (args.empty())
+    {
+        std::cerr << "Error: Missing file name." << std::endl;
+        return;
+    }
+
+    if (!DeleteFileA(args[0].c_str()))
+    {
+        std::cerr << "Error: Failed to delete file '" << args[0]
+                  << "' (Error: " << GetLastError() << ")" << std::endl;
+    }
+    else
+    {
+        std::cout << "Deleted file: " << args[0] << std::endl;
+    }
+}
+
+bool removeDirectoryRecursiveHelper(const std::string& path)
+{
+    WIN32_FIND_DATAA findData;
+    HANDLE hFind;
+    std::string searchPath = path + "\\*";
+    hFind = FindFirstFileA(searchPath.c_str(), &findData);
+
+    if (hFind == INVALID_HANDLE_VALUE)
+        return false;
+
+    do
+    {
+        std::string name = findData.cFileName;
+        if (name == "." || name == "..")
+            continue;
+
+        std::string fullPath = path + "\\" + name;
+
+        if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        {
+            // Recursive delete for subdirectories
+            if (!removeDirectoryRecursiveHelper(fullPath))
+            {
+                FindClose(hFind);
+                return false;
+            }
+        }
+        else
+        {
+            // Delete file
+            if (!DeleteFileA(fullPath.c_str()))
+            {
+                std::cerr << "Error: Failed to delete file '" << fullPath << "'" << std::endl;
+                FindClose(hFind);
+                return false;
+            }
+        }
+    } while (FindNextFileA(hFind, &findData) != 0);
+
+    FindClose(hFind);
+
+    // Remove the empty directory
+    if (!RemoveDirectoryA(path.c_str()))
+    {
+        std::cerr << "Error: Failed to remove directory '" << path << "'" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+void removeDirectoryRecursive(const std::vector<std::string>& args)
+{
+    if (args.empty())
+    {
+        std::cerr << "Error: Missing directory name." << std::endl;
+        return;
+    }
+
+    DWORD attr = GetFileAttributesA(args[0].c_str());
+    if (attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_DIRECTORY))
+    {
+        std::cerr << "Error: Not a valid directory." << std::endl;
+        return;
+    }
+
+    if (removeDirectoryRecursiveHelper(args[0]))
+    {
+        std::cout << "Successfully removed directory and its contents: " << args[0] << std::endl;
+    }
+    else
+    {
+        std::cerr << "Error: Failed to remove directory." << std::endl;
+    }
+}
+
 #endif
