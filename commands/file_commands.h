@@ -297,7 +297,162 @@ void headCommand(const std::vector<std::string> &args)
         std::cout << buffer;
         ++line;
     }
+    std::cout << std::endl;
     fclose(file);
+}
+
+void printCurrentDirectory(const std::vector<std::string>& args)
+{
+    char buffer[MAX_PATH];
+    if (GetCurrentDirectoryA(MAX_PATH, buffer))
+    {
+        std::cout << "Current directory: " << buffer << std::endl;
+    }
+    else
+    {
+        std::cerr << "Error: Unable to get current directory." << std::endl;
+    }
+}
+
+void deleteFile(const std::vector<std::string>& args)
+{
+    if (args.empty())
+    {
+        std::cerr << "Error: Missing file name." << std::endl;
+        return;
+    }
+
+    if (!DeleteFileA(args[0].c_str()))
+    {
+        std::cerr << "Error: Failed to delete file '" << args[0]
+                  << "' (Error: " << GetLastError() << ")" << std::endl;
+    }
+    else
+    {
+        std::cout << "Deleted file: " << args[0] << std::endl;
+    }
+}
+
+bool removeDirectoryRecursiveHelper(const std::string& path)
+{
+    WIN32_FIND_DATAA findData;
+    HANDLE hFind;
+    std::string searchPath = path + "\\*";
+    hFind = FindFirstFileA(searchPath.c_str(), &findData);
+
+    if (hFind == INVALID_HANDLE_VALUE)
+        return false;
+
+    do
+    {
+        std::string name = findData.cFileName;
+        if (name == "." || name == "..")
+            continue;
+
+        std::string fullPath = path + "\\" + name;
+
+        if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        {
+            // Recursive delete for subdirectories
+            if (!removeDirectoryRecursiveHelper(fullPath))
+            {
+                FindClose(hFind);
+                return false;
+            }
+        }
+        else
+        {
+            // Delete file
+            if (!DeleteFileA(fullPath.c_str()))
+            {
+                std::cerr << "Error: Failed to delete file '" << fullPath << "'" << std::endl;
+                FindClose(hFind);
+                return false;
+            }
+        }
+    } while (FindNextFileA(hFind, &findData) != 0);
+
+    FindClose(hFind);
+
+    // Remove the empty directory
+    if (!RemoveDirectoryA(path.c_str()))
+    {
+        std::cerr << "Error: Failed to remove directory '" << path << "'" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+void removeDirectoryRecursive(const std::vector<std::string>& args)
+{
+    if (args.empty())
+    {
+        std::cerr << "Error: Missing directory name." << std::endl;
+        return;
+    }
+
+    DWORD attr = GetFileAttributesA(args[0].c_str());
+    if (attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_DIRECTORY))
+    {
+        std::cerr << "Error: Not a valid directory." << std::endl;
+        return;
+    }
+
+    if (removeDirectoryRecursiveHelper(args[0]))
+    {
+        std::cout << "Successfully removed directory and its contents: " << args[0] << std::endl;
+    }
+    else
+    {
+        std::cerr << "Error: Failed to remove directory." << std::endl;
+    }
+}
+
+void removeCommand(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        std::cout << "Usage: rm [-r] <file_or_directory>" << std::endl;
+        return;
+    }
+
+    if (args[0] == "-r") {
+        if (args.size() < 2) {
+            std::cout << "Usage: rm -r <directory>" << std::endl;
+            return;
+        }
+        // Gọi hàm xóa folder đệ quy
+        std::vector<std::string> subArgs(args.begin() + 1, args.end());
+        removeDirectoryRecursive(subArgs);
+    } else {
+        // Gọi hàm xóa file/folder thường
+        deleteFile(args);
+    }
+}
+
+void clearCLS(const std::vector<std::string>& args) {
+    // Like the 'cls' command in Windows, this function clears the console screen.
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    COORD coord = {0, 0};
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    DWORD written;
+    if (hConsole == INVALID_HANDLE_VALUE) {
+        std::cerr << "Error: Unable to get console handle." << std::endl;
+        return;
+    }
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        std::cerr << "Error: Unable to get console buffer info." << std::endl;
+        return;
+    }
+    DWORD size = csbi.dwSize.X * csbi.dwSize.Y;
+    if (!FillConsoleOutputCharacterA(hConsole, ' ', size, coord, &written)) {
+        std::cerr << "Error: Unable to fill console output." << std::endl;
+        return;
+    }
+    if (!FillConsoleOutputAttribute(hConsole, csbi.wAttributes, size, coord, &written)) {
+        std::cerr << "Error: Unable to fill console attributes." << std::endl;
+        return;
+    }
+    SetConsoleCursorPosition(hConsole, coord);
 }
 
 #endif

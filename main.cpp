@@ -1,6 +1,7 @@
 #include "command_manager.h"
 #include "commands/file_commands.h"
 #include "commands/process_commands.h"
+#include "commands/disk_commands.h"
 #include "utils.h"
 
 CommandManager shell;
@@ -15,6 +16,8 @@ void registerCommand()
     shell.registerCommand("ls", listFiles);        // Liệt kê các file và folder ở folder hiện tại
     shell.registerCommand("mkdir", makeDirectory); // Tạo folder mới tại folder hiện tại
     shell.registerCommand("cd", changeDirectory);
+    shell.registerCommand("pwd", printCurrentDirectory); // Hiển thị đường dẫn hiện tại
+    shell.registerCommand("rm", removeCommand); // Xóa file hoặc folder: rm file, rm -r folder
     shell.registerCommand("cp", copyFile);
     shell.registerCommand("mv", moveFileOrDirectory);
     shell.registerCommand("touch", touchCommand); // Create an empty file: touch file
@@ -24,6 +27,8 @@ void registerCommand()
     // ---- Process Management ----------
     shell.registerCommand("ps", listProcesses);
     shell.registerCommand("run", runExternalCommand);
+    shell.registerCommand("top", topCommand); // Hiển thị tiến trình theo thời gian thực (background mode)
+    shell.registerCommand("pgrep", findProcessByName); // Tìm kiếm tiến trình theo tên
     shell.registerCommand("jobs", jobsCommand);
     shell.registerCommand("fg", fgCommand); // Thêm lệnh fg
     shell.registerCommand("bg", bgCommand);
@@ -31,6 +36,12 @@ void registerCommand()
     shell.registerCommand("kill", killCommand);       // Kết thúc tiến trình theo PID: kill <PID>
     shell.registerCommand("killall", killAllCommand); // Kết thúc tất cả tiến trình có cùng tên: killall <process_name>
     // ----  
+
+    // ---- Disk Management -----------
+    shell.registerCommand("df", checkCapacityMemory); // Kiểm tra dung lượng ổ đĩa
+    shell.registerCommand("du", showCapacityFolder); // Kiểm tra dung lượng folder
+    shell.registerCommand("di", showCapacityFile); // Kiểm tra dung lượng file
+    shell.registerCommand("clear", clearCLS); //Lệnh clear tương tự như lệnh cls trong Windows
 
     // Thiết lập handler
     SetupConsoleCtrlHandler();
