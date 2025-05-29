@@ -25,16 +25,15 @@ void registerCommand()
     shell.registerCommand("head", headCommand);   // Display the first 10 lines of file: head file
 
     // ---- Process Management ----------
-    shell.registerCommand("ps", listProcesses);
-    shell.registerCommand("run", runExternalCommand);
-    shell.registerCommand("top", topCommand); // Hiển thị tiến trình theo thời gian thực (background mode)
-    shell.registerCommand("pgrep", findProcessByName); // Tìm kiếm tiến trình theo tên
-    shell.registerCommand("jobs", jobsCommand);
-    shell.registerCommand("fg", fgCommand); // Thêm lệnh fg
-    shell.registerCommand("bg", bgCommand);
-    // shell.registerCommand("suspended", showSuspendedProcesses);
-    shell.registerCommand("kill", killCommand);       // Kết thúc tiến trình theo PID: kill <PID>
-    shell.registerCommand("killall", killAllCommand); // Kết thúc tất cả tiến trình có cùng tên: killall <process_name>
+    shell.registerCommand("run", runExternalCommand);    // Chạy tiến trình: run python main.py (fg); run python main.py & (bg)
+    shell.registerCommand("ps", listProcessCommand);     // Hiển thị danh sách tiến trình đang chạy 
+    shell.registerCommand("top", topCommand);            // !!! [Cái này chưa ổn] Hiển thị tiến trình theo thời gian thực (background mode) 
+    shell.registerCommand("pgrep", findProcessByName);   // Tìm kiếm tiến trình theo tên
+    shell.registerCommand("suspend", suspendCommand);    // Tạm dừng tiến trình: suspend <PID>
+    shell.registerCommand("resume", resumeCommand);      // Resume một tiến trình đã bị tạm dừng ở dạng background: resume <PID>
+    shell.registerCommand("fg", fgCommand);              // Thêm lệnh fg <pid> để đưa tiến trình từ background lên foreground
+    shell.registerCommand("kill", killCommand);          // Kết thúc tiến trình theo PID: kill <PID>
+    shell.registerCommand("killall", killAllCommand);    // Kết thúc tất cả tiến trình có cùng tên: killall <process_name>
     // ----  
 
     // ---- Disk Management -----------
