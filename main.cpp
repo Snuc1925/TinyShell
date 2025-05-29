@@ -6,7 +6,7 @@
 
 CommandManager shell;
 // Global variables
-std::vector<Job> backgroundJobs;
+std::vector<ProcessInfo> processList;
 DWORD currentForegroundPid = 0;
 HANDLE currentForegroundProcess = NULL;
 

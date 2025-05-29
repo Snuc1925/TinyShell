@@ -8,8 +8,8 @@
 #include <algorithm>  // Added for std::remove_if
 #include <vector>
 
-// Struct lưu thông tin tiến trình background
-struct Job
+// Struct lưu thông tin tiến trình
+struct ProcessInfo
 {
     DWORD pid;
     HANDLE hProcess;
@@ -18,7 +18,7 @@ struct Job
 };
 
 // Biến toàn cục
-extern std::vector<Job> backgroundJobs;
+extern std::vector<ProcessInfo> processList;
 extern DWORD currentForegroundPid;
 extern HANDLE currentForegroundProcess;
 
@@ -35,15 +35,15 @@ void SetupConsoleCtrlHandler() {
 
 void listProcessCommand(const std::vector<std::string> &args)
 {
-    // Cập nhật danh sách jobs: loại bỏ tiến trình đã kết thúc
-    for (auto it = backgroundJobs.begin(); it != backgroundJobs.end();)
+    // Cập nhật danh sách tiến trình: loại bỏ tiến trình đã kết thúc
+    for (auto it = processList.begin(); it != processList.end();)
     {
         DWORD status = WaitForSingleObject(it->hProcess, 0);
         if (status == WAIT_OBJECT_0)
         {
             // tiến trình đã kết thúc
             CloseHandle(it->hProcess);
-            it = backgroundJobs.erase(it);
+            it = processList.erase(it);
         }
         else
         {
@@ -51,16 +51,16 @@ void listProcessCommand(const std::vector<std::string> &args)
         }
     }
 
-    if (backgroundJobs.empty())
+    if (processList.empty())
     {
-        std::cout << "No background jobs.\n";
+        std::cout << "No background processes.\n";
         return;
     }
 
-    std::cout << "Background jobs:\n";
-    for (const auto& job : backgroundJobs) {
-        std::cout << "PID: " << job.pid << " - " << job.cmdLine 
-                  << " [" << (job.isSuspended ? "Suspended" : "Running") << "]\n";
+    std::cout << "Background processes:\n";
+    for (const auto& process : processList) {
+        std::cout << "PID: " << process.pid << " - " << process.cmdLine 
+                  << " [" << (process.isSuspended ? "Suspended" : "Running") << "]\n";
     }
 }
 
@@ -104,23 +104,23 @@ void topCommand(const std::vector<std::string>& args) {
 
         CloseHandle(hSnap);
         std::cout << "Press Ctrl+C to stop.\n";
-        // Cập nhật danh sách tiến trình nền
-        for (auto it = backgroundJobs.begin(); it != backgroundJobs.end();) {
+        // Cập nhật danh sách tiến trình
+        for (auto it = processList.begin(); it != processList.end();) {
             DWORD status = WaitForSingleObject(it->hProcess, 0);
             if (status == WAIT_OBJECT_0) {
                 // tiến trình đã kết thúc
                 CloseHandle(it->hProcess);
-                it = backgroundJobs.erase(it);
+                it = processList.erase(it);
             } else {
                 ++it;
             }
         }
-        if (backgroundJobs.empty()) {
-            std::cout << "No background jobs.\n";
+        if (processList.empty()) {
+            std::cout << "No background processes.\n";
         } else {
-            std::cout << "Background jobs:\n";
-            for (const auto& job : backgroundJobs) {
-                std::cout << "PID: " << job.pid << " - " << job.cmdLine << std::endl;
+            std::cout << "Background processes:\n";
+            for (const auto& process : processList) {
+                std::cout << "PID: " << process.pid << " - " << process.cmdLine << std::endl;
             }
         }
 
@@ -129,27 +129,26 @@ void topCommand(const std::vector<std::string>& args) {
         // Đợi 1 giây trước khi cập nhật lại
         Sleep(1000);
 
-        //Kiêm tra xem có tiến trình nào đã kết thúc không
-        for (auto it = backgroundJobs.begin(); it != backgroundJobs.end();) {
+        //Kiểm tra xem có tiến trình nào đã kết thúc không
+        for (auto it = processList.begin(); it != processList.end();) {
             DWORD status = WaitForSingleObject(it->hProcess, 0);
             if (status == WAIT_OBJECT_0) {
                 // tiến trình đã kết thúc
                 CloseHandle(it->hProcess);
-                it = backgroundJobs.erase(it);
+                it = processList.erase(it);
             } else {
                 ++it;
             }
         }
 
-        if (backgroundJobs.empty()) {
-            std::cout << "No background jobs.\n";
+        if (processList.empty()) {
+            std::cout << "No background processes.\n";
         } else {
-            std::cout << "Background jobs:\n";
-            for (const auto& job : backgroundJobs) {
-                std::cout << "PID: " << job.pid << " - " << job.cmdLine << std::endl;
+            std::cout << "Background processes:\n";
+            for (const auto& process : processList) {
+                std::cout << "PID: " << process.pid << " - " << process.cmdLine << std::endl;
             }
         }
-
 
         std::cout << "Press Ctrl+C to stop.\n";
     
@@ -237,7 +236,7 @@ void runExternalCommand(const std::vector<std::string> &args)
     std::cout << "Started process with PID: " << pi.dwProcessId << "\n";
 
     if (isBackground) {
-        backgroundJobs.push_back({ pi.dwProcessId, pi.hProcess, cmdLine, false });
+        processList.push_back({ pi.dwProcessId, pi.hProcess, cmdLine, false });
         CloseHandle(pi.hThread);
     } else {
         currentForegroundPid = pi.dwProcessId;
@@ -246,7 +245,7 @@ void runExternalCommand(const std::vector<std::string> &args)
         // Đợi với timeout thay vì INFINITE
         while (WaitForSingleObject(pi.hProcess, 100) == WAIT_TIMEOUT) {
             if (currentForegroundPid == 0) {  // Đã bị tạm dừng
-                backgroundJobs.push_back({ pi.dwProcessId, pi.hProcess, cmdLine, true });
+                processList.push_back({ pi.dwProcessId, pi.hProcess, cmdLine, true });
                 return;
             }
         }
@@ -311,10 +310,10 @@ void suspendCommand(const std::vector<std::string>& args) {
         return;
     }
 
-    for (auto& job : backgroundJobs) {
-        if (job.pid == pid && !job.isSuspended) {
+    for (auto& process : processList) {
+        if (process.pid == pid && !process.isSuspended) {
             if (SuspendProcess(pid)) {
-                job.isSuspended = true;
+                process.isSuspended = true;
                 std::cout << "[Suspended] " << pid << std::endl;
                 return;
             }
@@ -363,10 +362,10 @@ void resumeCommand(const std::vector<std::string>& args) {
         return;
     }
 
-    for (auto& job : backgroundJobs) {
-        if (job.pid == pid && job.isSuspended) {
+    for (auto& process : processList) {
+        if (process.pid == pid && process.isSuspended) {
             if (ResumeProcess(pid)) {
-                job.isSuspended = false;
+                process.isSuspended = false;
                 std::cout << "[Running] " << pid << std::endl;
                 return;
             }
@@ -379,7 +378,7 @@ void resumeCommand(const std::vector<std::string>& args) {
 BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
     if (dwCtrlType == CTRL_C_EVENT && currentForegroundPid != 0) {
         if (SuspendProcess(currentForegroundPid)) {
-            // backgroundJobs.push_back({ currentForegroundPid, currentForegroundProcess, "", true });
+            // processList.push_back({ currentForegroundPid, currentForegroundProcess, "", true });
             std::cout << "\n[Suspended] " << currentForegroundPid << std::endl;
             
             // Reset foreground process
@@ -410,7 +409,7 @@ void fgCommand(const std::vector<std::string>& args) {
         return;
     }
 
-    for (auto it = backgroundJobs.begin(); it != backgroundJobs.end(); ++it) {
+    for (auto it = processList.begin(); it != processList.end(); ++it) {
         if (it->pid == pid && it->isSuspended) {
             if (ResumeProcess(pid)) {
                 currentForegroundPid = pid;
@@ -424,7 +423,7 @@ void fgCommand(const std::vector<std::string>& args) {
 
                 // WaitForSingleObject(it->hProcess, INFINITE);
                 CloseHandle(it->hProcess);
-                backgroundJobs.erase(it);
+                processList.erase(it);
                 currentForegroundPid = 0;
                 currentForegroundProcess = NULL;
                 return;
@@ -454,13 +453,13 @@ void killCommand(const std::vector<std::string> &args)
         return;
     }
 
-    // Kiểm tra xem PID có trong backgroundJobs không
-    auto it = std::find_if(backgroundJobs.begin(), backgroundJobs.end(),
-                           [pid](const Job &job) { return job.pid == pid; });
+    // Kiểm tra xem PID có trong processList không
+    auto it = std::find_if(processList.begin(), processList.end(),
+                           [pid](const ProcessInfo &process) { return process.pid == pid; });
 
-    if (it == backgroundJobs.end())
+    if (it == processList.end())
     {
-        std::cerr << "Error: PID " << pid << " is not a background job." << std::endl;
+        std::cerr << "Error: PID " << pid << " is not a background process." << std::endl;
         return;
     }
 
@@ -478,7 +477,7 @@ void killCommand(const std::vector<std::string> &args)
     else
     {
         std::cout << "Process " << pid << " terminated." << std::endl;
-        backgroundJobs.erase(it); // Xóa khỏi danh sách background
+        processList.erase(it); // Xóa khỏi danh sách tiến trình
     }
 
     CloseHandle(hProcess);
@@ -495,26 +494,26 @@ void killAllCommand(const std::vector<std::string> &args)
     std::string targetName = args[0];
     int killed = 0;
 
-    // Duyệt qua backgroundJobs để tìm process có tên phù hợp
-    for (auto it = backgroundJobs.begin(); it != backgroundJobs.end(); )
+    // Duyệt qua processList để tìm process có tên phù hợp
+    for (auto it = processList.begin(); it != processList.end(); )
     {
-        const Job &job = *it;
+        const ProcessInfo &process = *it;
         // Trích xuất tên executable từ command line
-        std::string exeName = job.cmdLine;
+        std::string exeName = process.cmdLine;
         size_t lastSlash = exeName.find_last_of("\\/");
         if (lastSlash != std::string::npos)
             exeName = exeName.substr(lastSlash + 1);
 
         if (exeName == targetName)
         {
-            HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, job.pid);
+            HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, process.pid);
             if (hProcess)
             {
                 if (TerminateProcess(hProcess, 0))
                 {
-                    std::cout << "Terminated PID: " << job.pid << std::endl;
+                    std::cout << "Terminated PID: " << process.pid << std::endl;
                     hProcess = nullptr;
-                    it = backgroundJobs.erase(it); // Xóa khỏi danh sách background
+                    it = processList.erase(it); // Xóa khỏi danh sách tiến trình
                     ++killed;
                     continue; // Bỏ qua tăng iterator vì đã xóa
                 }
