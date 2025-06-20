@@ -2,19 +2,60 @@
 #define COMMON_COMMANDS_H
 
 #include "../command_manager.h"
-#include "../process_commands.h"
+#include "../commands/process_commands.h"
 #include <windows.h>
 #include <tlhelp32.h>
 #include <sstream>
 #include <algorithm>  
 #include <vector>
 
-void exitCommand(const std::vector<std::string>& args) {
-    std::cout << "Đang thoát shell...\n";
-    std::exit(0);
+// void exitCommand(const std::vector<std::string>& args) {
+//     std::cout << "Đang thoát shell...\n";
+//     std::exit(0);
 
-    exit -r : thoát mà giữ lại tiến trình đang chạy
-    exit : thoát và dừng hết tiến trình do tinyshell quản lý
+//     // exit -r : thoát và dừng hết tiến trình do tinyshell quản lý
+//     // exit : thoát và vẫn giữ nguyên tiến trình
+// }
+
+// Hàm hỗ trợ để kết thúc tất cả các tiến trình con
+void terminateManagedProcesses() {
+    if (processList.empty()) {
+        std::cout << "No managed processes to terminate.\n";
+        return;
+    }
+
+    std::cout << "Terminating all managed processes...\n";
+    
+    // Iterate through all processes in processList
+    for (auto it = processList.begin(); it != processList.end(); ) {
+        HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, it->pid);
+        if (hProcess) {
+            if (TerminateProcess(hProcess, 0)) {
+                std::cout << "Terminated PID: " << it->pid << " - " << it->cmdLine << "\n";
+                CloseHandle(hProcess);
+                CloseHandle(it->hProcess);  // Close the stored handle too
+                it = processList.erase(it);
+                continue;  // Skip increment since we erased
+            }
+            CloseHandle(hProcess);
+        } else {
+            std::cerr << "Failed to open process PID: " << it->pid << "\n";
+        }
+        ++it;
+    }
+    
+    std::cout << "All managed processes terminated.\n";
+}
+
+void exitCommand(const std::vector<std::string>& args) {
+    if (args.size() > 0 && args[0] == "-r") {
+        std::cout << "Stopping all processes and exit the shell...\n";
+        terminateManagedProcesses();
+    } else {
+        std::cout << "Exit the shell...\n";
+    }
+    
+    std::exit(0);
 }
 
 void helpCommand(const std::vector<std::string>& args) {
