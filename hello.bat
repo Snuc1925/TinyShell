@@ -1,26 +1,26 @@
 @echo off
-echo ==== Bat script đang chạy... ====
+echo ==== Bat script is running... ====
 
-echo Bước 1: Tạo thư mục Demo
+echo Step 1: Create Demo folder
 mkdir Demo
 
-echo Bước 2: Chuyển vào thư mục Demo
+echo Step 2: Move to Demo
 cd Demo
 
-echo Bước 3: Tạo file hello.txt
+echo Step 3: Create file hello.txt
 echo Hello, world! > hello.txt
 
-echo Bước 4: Hiển thị nội dung file
+echo Step 4: Show file's text
 type hello.txt
 
-echo Bước 5: Đợi người dùng nhấn phím
+echo Step 5: Wait for key presses
 pause
 
-echo Bước 6: Quay về thư mục gốc
+echo Step 6: Return to the original folder
 cd ..
 
-echo Bước 7: Xoá thư mục Demo và toàn bộ nội dung bên trong
+echo Step 7: Delete Demo folder and its files
 rmdir /S /Q Demo
 
-echo === Đã hoàn tất! ===
+echo === Done! ===
 pause

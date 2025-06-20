@@ -76,10 +76,10 @@ void helpCommand(const std::vector<std::string>& args) {
     std::cout << "-- Process Management --\n";
     std::cout << "  run <cmd> [&]    : Run a program (use & to run in background)\n";
     std::cout << "  ps               : List running processes\n";
-    std::cout << "  top              : Show real-time process usage\n";
+    // std::cout << "  top              : Show real-time process usage\n";
     std::cout << "  pgrep <name>     : Find a process by name\n";
     std::cout << "  suspend <PID>    : Suspend a process\n";
-    std::cout << "  resume <PID>     : Resume a suspended process\n";
+    std::cout << "  resume <PID>     : Resume a suspended process to background\n";
     std::cout << "  fg <PID>         : Bring a background process to foreground\n";
     std::cout << "  kill <PID>       : Terminate a process by PID\n";
     std::cout << "  killall <name>   : Terminate all processes with the given name\n\n";
@@ -91,7 +91,7 @@ void helpCommand(const std::vector<std::string>& args) {
 
     std::cout << "-- Common --\n";
     std::cout << "  help             : Display this help menu\n";
-    std::cout << "  exit             : Exit the shell\n";
+    std::cout << "  exit             : Exit the shell (use -r to delete all background processes)\n";
     std::cout << "  clear            : Clear the screen (similar to 'cls')\n";
 
     std::cout << "\n====================================\n";
