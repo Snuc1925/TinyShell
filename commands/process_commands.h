@@ -5,7 +5,7 @@
 #include <windows.h>
 #include <tlhelp32.h>
 #include <sstream>
-#include <algorithm>  // Added for std::remove_if
+#include <algorithm>  
 #include <vector>
 
 // Struct lưu thông tin tiến trình
@@ -26,7 +26,6 @@ extern HANDLE currentForegroundProcess;
 BOOL SuspendProcess(DWORD pid);
 BOOL ResumeProcess(DWORD pid);
 BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType);
-
 
 
 void SetupConsoleCtrlHandler() {

@@ -2,6 +2,7 @@
 #include "commands/file_commands.h"
 #include "commands/process_commands.h"
 #include "commands/disk_commands.h"
+#include "commands/common_commands.h"
 #include "utils.h"
 
 CommandManager shell;
@@ -40,7 +41,11 @@ void registerCommand()
     shell.registerCommand("df", checkCapacityMemory); // Kiểm tra dung lượng ổ đĩa
     shell.registerCommand("du", showCapacityFolder); // Kiểm tra dung lượng folder
     shell.registerCommand("di", showCapacityFile); // Kiểm tra dung lượng file
-    shell.registerCommand("clear", clearCLS); //Lệnh clear tương tự như lệnh cls trong Windows
+
+    // ---- Common --------------------
+    shell.registerCommand("help", helpCommand); // help command
+    shell.registerCommand("exit", exitCommand); // exit command
+    shell.registerCommand("clear", clearScreenCommand);   // Lệnh clear tương tự như lệnh cls trong Windows
 
     // Thiết lập handler
     SetupConsoleCtrlHandler();
@@ -62,8 +67,6 @@ int main()
         set_color(7); // Màu trắng cho input
 
         std::getline(std::cin, input);
-        if (input == "exit")
-            break;
         shell.executeCommand(input);
     }
 

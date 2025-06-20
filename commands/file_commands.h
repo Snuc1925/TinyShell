@@ -429,30 +429,6 @@ void removeCommand(const std::vector<std::string>& args) {
     }
 }
 
-void clearCLS(const std::vector<std::string>& args) {
-    // Like the 'cls' command in Windows, this function clears the console screen.
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    COORD coord = {0, 0};
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    DWORD written;
-    if (hConsole == INVALID_HANDLE_VALUE) {
-        std::cerr << "Error: Unable to get console handle." << std::endl;
-        return;
-    }
-    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
-        std::cerr << "Error: Unable to get console buffer info." << std::endl;
-        return;
-    }
-    DWORD size = csbi.dwSize.X * csbi.dwSize.Y;
-    if (!FillConsoleOutputCharacterA(hConsole, ' ', size, coord, &written)) {
-        std::cerr << "Error: Unable to fill console output." << std::endl;
-        return;
-    }
-    if (!FillConsoleOutputAttribute(hConsole, csbi.wAttributes, size, coord, &written)) {
-        std::cerr << "Error: Unable to fill console attributes." << std::endl;
-        return;
-    }
-    SetConsoleCursorPosition(hConsole, coord);
-}
+
 
 #endif
